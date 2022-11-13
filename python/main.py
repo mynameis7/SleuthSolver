@@ -5,6 +5,7 @@ direct_card_input = re.compile("(.*)\[(.*)\]")
 ColorPossibilities = set(['R', 'B', 'Y', 'G'])
 NumberPossibilities = set(['1', '2', '3'])
 StonePossibilities = set(['D', 'O', 'P'])
+deck = [i for i in it.product(ColorPossibilities, NumberPossibilities, StonePossibilities)]
 
 class Knowledge(object):
     def __init__(self, knowledge):
@@ -85,33 +86,66 @@ def passes(state, knowledge: list[Knowledge], hand_size:int):
     return True
 
 
-        
+def process_cycle(all_states, knowledge, hand_size):
+    working_states, all_states = it.tee(all_states)
+    peek = (state for state in working_states if passes(state, knowledge, hand_size))
+    state1 = next(peek, None)
+    state2 = next(peek, None)
+    del peek
+    if state1 is None:
+        print("Contradiction")
+        raise Exception("Contradictory knowledge")
+    if state2 is None:
+        print("Solved!")
+        return state1[0]
+    return None, (state for state in all_states if passes(state, knowledge, hand_size))
+            
 
-def main():
-
-    deck = it.product(ColorPossibilities, NumberPossibilities, StonePossibilities)
-
-    player_cards = set((str_to_card_tup(_str) for _str in ["R1D", "B3P","R2O", "Y3P", "G1D", "Y1O", "B2D","G3D"]))
-    face_up = set((str_to_card_tup(_str) for _str in ["B2P", "Y1P", "G2P"]))
-    deck = set(deck) - set(player_cards) - set(face_up)
+def main(working_deck, hand_size):
     knowledge: list[Knowledge] = []
-    states = it.permutations(deck, len(deck))
+    all_states = it.permutations(working_deck, len(working_deck))
     while True:
         print("Send knowledge in format <Player Number>:<Number of cards>,<Question Asked>[<Comma Seperated Explicit Cards>]")
         new_know = input("  >")
         know = parse_new_knowledge(new_know)
         knowledge.append(know)
-        states = (state for state in states if passes(state, knowledge, 8))
-        state1 = next(states, None)
-        state2 = next(states, None)
-        if state1 is None:
-            print("Contradiction")
-            break
-        if state2 is None:
-            print("Solved!")
-            print(state1[0])
-            break
-        
-
+        working_states, all_states = it.tee(all_states)
+        result, _ = process_cycle(working_states, knowledge, hand_size)
+        if result:
+            return result
+def count(iterable):
+    return sum(1 for _ in iterable)
+    
+def solver_mode(working_deck, hand_size, knowledge_lines):
+    knowledge: list[Knowledge] = []
+    all_states = it.permutations(working_deck, len(working_deck))
+    final_states, all_states= it.tee(all_states)
+    for line in knowledge_lines:
+        know = parse_new_knowledge(line)
+        knowledge.append(know)
+        working_states, all_states = it.tee(all_states)
+        result, final_states = process_cycle(working_states, knowledge, hand_size)
+        if result:
+            return result, final_states
+    return None, final_states
+    
+bool_conv = {"false": False, "true": True}
 if __name__ == "__main__":
-    main()
+    with open("INPUT.txt") as f:
+        f_lines = [line for line in f]
+    player_cards = [str_to_card_tup(i.strip()) for i in f_lines[0].split(",")]
+    face_up = [str_to_card_tup(i.strip()) for i in f_lines[1].split(",")]
+    hand_size = int(f_lines[2])
+    working_deck = set(deck) - set(player_cards) - set(face_up)
+    manual_mode = bool_conv[f_lines[3].lower()]
+    if manual_mode:
+        result = main(working_deck, hand_size)
+        print(result)
+    else:
+        result, final_states = solver_mode(working_deck, hand_size, f_lines[4:])
+        if not result:
+            print("unable to actually solve")
+            print("remaining results with current knowledge: ",end="")
+            print(count(final_states))
+        else:
+            print(result)

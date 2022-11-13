@@ -1,0 +1,4 @@
+R1D, B3P, R2O, Y3P, G1D, Y1O, B2D,G3D
+B2P, Y1P, G2P
+8
+False
