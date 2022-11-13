@@ -2,6 +2,9 @@ import itertools as it
 import re
 
 direct_card_input = re.compile("(.*)\[(.*)\]")
+ColorPossibilities = set(['R', 'B', 'Y', 'G'])
+NumberPossibilities = set(['1', '2', '3'])
+StonePossibilities = set(['D', 'O', 'P'])
 
 class Knowledge(object):
     def __init__(self, knowledge):
@@ -27,13 +30,44 @@ def parse_new_knowledge(knowledge: str): #1:1,BD[R1P]
         question_asked = b
     return Knowledge((player_num, num, question_asked, card_tups))
 
-def passes(state, knowledge: list[Knowledge]):
+def passes(state, knowledge: list[Knowledge], hand_size:int):
+    def explicit_card_missing(e:Knowledge, player):
+        if e.cards:
+            for card in e.cards:
+                if card not in player:
+                    return True
+        return False
+    def filter_attribute(cards, attribute):
+        return [i for i in cards if attribute in i]
+    def question_asked_fail(e:Knowledge, player):
+        color = list(ColorPossibilities.intersection(e.question_asked))
+        number = list(NumberPossibilities.intersection(e.question_asked))
+        stone = list(StonePossibilities.intersection(e.question_asked))
+        color = color[0] if color else None
+        number = number[0] if number else None
+        stone = stone[0] if stone else None
+        final = filter_attribute(player, color)
+        final = filter_attribute(final, number)
+        final = filter_attribute(final, stone)
+        if len(final) != element.num:
+            return True
+        return False
+    facedown = state[0]
+    players = state[1:]
+    players_split = list(it.zip_longest(*[iter(players)] * hand_size))
+    for element in knowledge:
+        player = set(players_split[element.player_num-1])
+        if explicit_card_missing(element, player):
+            return False
+        if question_asked_fail(element, player):
+            return False
+    return True
 
+
+        
 
 def main():
-    ColorPossibilities = set(['R', 'B', 'Y', 'G'])
-    NumberPossibilities = set(['1', '2', '3'])
-    StonePossibilities = set(['D', 'O', 'P'])
+
     deck = it.product(ColorPossibilities, NumberPossibilities, StonePossibilities)
 
     player_cards = set((str_to_card_tup(_str) for _str in ["R1D", "B3P","R2O", "Y3P", "G1D", "Y1O", "B2D","G3D"]))
@@ -41,12 +75,16 @@ def main():
     deck = set(deck) - set(player_cards) - set(face_up)
     knowledge: list[Knowledge] = []
     states = [i for i in it.permutations(deck, len(deck))]
-    while True:
+    print(len(states))
+    while len(states) > 1:
         new_know = input()
         know = parse_new_knowledge(new_know)
         knowledge.append(know)
-        states = [state for state in states if passes(state, knowledge)]
-
+        states = [state for state in states if passes(state, knowledge, 8)]
+        print(len(states))
+        if len(states) == 0:
+            print("Contradiction")
+            break
 
 if __name__ == "__main__":
     main()
