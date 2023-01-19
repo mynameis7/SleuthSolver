@@ -4,4 +4,4 @@ B2P, Y1P, G2P
 False
 1:0,R
 2:1,R
-3:2,BP[BP1,BP2]
+3:2,BP
