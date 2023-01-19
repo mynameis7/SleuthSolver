@@ -29,7 +29,7 @@ def parse_new_knowledge(knowledge: str): #1:1,BD[R1P]
         question_asked = has_specific_cards.group(1)
     else:
         question_asked = b
-    return Knowledge((player_num, num, question_asked, card_tups))
+    return Knowledge((int(player_num), int(num), question_asked, card_tups))
 
 def passes(state, knowledge: list[Knowledge], hand_size:int):
     def explicit_card_missing(e:Knowledge, player):
@@ -85,10 +85,16 @@ def passes(state, knowledge: list[Knowledge], hand_size:int):
             return False
     return True
 
+def do_iter(working_states, knowledge):
+    for state in working_states:
+        if passes(state, knowledge, hand_size):
+            yield state
+    
+
 
 def process_cycle(all_states, knowledge, hand_size):
     working_states, all_states = it.tee(all_states)
-    peek = (state for state in working_states if passes(state, knowledge, hand_size))
+    peek = do_iter(working_states, knowledge)
     state1 = next(peek, None)
     state2 = next(peek, None)
     del peek
@@ -137,7 +143,7 @@ if __name__ == "__main__":
     face_up = [str_to_card_tup(i.strip()) for i in f_lines[1].split(",")]
     hand_size = int(f_lines[2])
     working_deck = set(deck) - set(player_cards) - set(face_up)
-    manual_mode = bool_conv[f_lines[3].lower()]
+    manual_mode = bool_conv[f_lines[3].strip().lower()]
     if manual_mode:
         result = main(working_deck, hand_size)
         print(result)
