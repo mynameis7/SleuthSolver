@@ -1,6 +1,9 @@
 import itertools as it
 
 import re
+import timeit
+
+
 
 direct_card_input = re.compile("(.*)\[(.*)\]")
 
@@ -28,11 +31,14 @@ class Player(object):
 class Opponent(object):
     def __init__(self, hand_size):
         self.hand_size = hand_size
-        self.card_potentials = []
+        self.card_potentials = None
         self.knowledge = []
+        self.game_state = None
+        self.eliminated_cards = set()
 
     def init_opponent(self, remaining_deck):
         self.card_potentials = [set(i) for i in it.combinations(remaining_deck, self.hand_size)]
+        self.game_state = set(remaining_deck)
 
     def add_knowledge(self, knowledge: Knowledge):
         self.knowledge.append(knowledge)
@@ -41,10 +47,27 @@ class Opponent(object):
         self.card_potentials = [i for i in self.card_potentials if self.passes(i)]
         return self.find_certain_cards()
 
+    def eliminate_cards(self, cards):
+        for card in cards:
+            self.eliminated_cards.add(card)
+        self.card_potentials = [i for i in self.card_potentials if self.passes(i)]
+
     def find_certain_cards(self):
-        pass
+        cards_in_all_hands = set()
+        for card in self.game_state:
+            hands_with_card = [i for i in self.card_potentials if card in i]
+            if len(self.card_potentials) == len(hands_with_card):
+                cards_in_all_hands.add(card)
+        return cards_in_all_hands
+            
+
     
     def passes(self, hand):
+        def has_eliminated_cards(player):
+            for card in self.eliminated_cards:
+                if card in player:
+                    return True
+            return False
         def explicit_card_missing(e:Knowledge, player):
             if e.cards:
                 for card in e.cards:
@@ -85,8 +108,10 @@ class Opponent(object):
                     return True
                 return False
 
+        player = set(hand)
+        if has_eliminated_cards(player):
+            return False
         for element in self.knowledge:
-            player = set(hand)
             if explicit_card_missing(element, player):
                 return False
             if has_invalid_non_cards(element, player):
@@ -112,7 +137,6 @@ def parse_new_knowledge(knowledge: str): #1:1,BD[R1P]
 class GameState(object):
     def __init__(self, player_count):
         self.hand_size = int((36 - 1)/player_count)
-        print(hand_size)
         self.player = Player()
         self.opponents = [Opponent(self.hand_size) for i in range(player_count-1)]
         self.game_state = set(FullDeck)
@@ -135,34 +159,49 @@ class GameState(object):
         knowledge = parse_new_knowledge(knowledge_string)
         self.knowledge.append(knowledge)
         new_solved_cards = self.opponents[knowledge.player_num-1].add_knowledge(knowledge)
+        if new_solved_cards:
+            for i in range(len(self.opponents)):
+                if i != knowledge.player_num-1:
+                    self.opponents[i].eliminate_cards(new_solved_cards)
 
 
 bool_conv = {"false": False, "true": True}
 def str_to_card_tup(str_val):
     return (str_val[0], str_val[1], str_val[2])
 
-with open("INPUT.txt") as f:
-    f_lines = [line.strip() for line in f]
-# f_lines = [
-#     "R1D, B3P, R2O, Y3P, G1D, Y1O, B2D,G3D",
-#     "B2P, Y1P, G2P",
-#     "8",
-#     "False",
-#     "1:0,R",
-#     "1:0,B",
-#     "1:0,Y",
-# ]
-player_cards = [str_to_card_tup(i.strip()) for i in f_lines[0].split(",")]
-face_up = [str_to_card_tup(i.strip()) for i in f_lines[1].split(",")]
-hand_size = int(f_lines[2])
-game = GameState(4)
-game.init_public_knowledge(face_up)
-game.init_player(player_cards)
-game.ready()
-knowledge_lines = f_lines[4:]
-for line in knowledge_lines:
-    game.add_knowledge(line)
+def main():
+    with open("INPUT.txt") as f:
+        f_lines = [line.strip() for line in f]
+    # f_lines = [
+    #     "R1D, B3P, R2O, Y3P, G1D, Y1O, B2D,G3D",
+    #     "B2P, Y1P, G2P",
+    #     "8",
+    #     "False",
+    #     "1:0,R",
+    #     "1:0,B",
+    #     "1:0,Y",
+    # ]
+    player_cards = [str_to_card_tup(i.strip()) for i in f_lines[0].split(",")]
+    face_up = [str_to_card_tup(i.strip()) for i in f_lines[1].split(",")]
+    game = GameState(4)
+    game.init_public_knowledge(face_up)
+    game.init_player(player_cards)
+    game.ready()
+    knowledge_lines = f_lines[3:]
+    for line in knowledge_lines:
+        game.add_knowledge(line)
 
-for opponent in game.opponents:
-    print([str(i) for i in opponent.knowledge])
-    print(len(opponent.card_potentials))
+    for opponent in game.opponents:
+        print([str(i) for i in opponent.knowledge])
+        print(len(opponent.card_potentials))
+
+
+if __name__ == "__main__":
+    main()
+
+# __SETUP__ = "from __main__ import main"
+# TEST_CODE = "main()"
+
+# print (timeit.timeit(setup = __SETUP__,
+#                      stmt = TEST_CODE,
+#                      number = 10))
